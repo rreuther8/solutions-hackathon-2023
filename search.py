@@ -36,27 +36,26 @@ def infer_separator(filename):
 		for separator in SEPARATORS:
 			if separator in first_line:
 				return separator
-		else:
-			raise ValueError(SEARCH_FAILURE_EXCEPTION.format('separators', file_regex))
+	return None
 
 
-def read_files(filenames):
+def read_files(filenames, file_regex):
 	separator = infer_separator(filenames[0])
+	if not separator:
+		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('separators', file_regex))
 
 	#read all files in a pandas dataframe and include the filename as a column
 	dataframe = pd.concat([pd.read_csv(filename, sep=separator).assign(filename=filename) for filename in filenames])
 
-	if len(dataframe) == 0:
-		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('files', column_regex))
 	return dataframe
 
 
 def get_column_regex_matches(df, column_regex):
 	columns = [c for c in df.columns if column_regex in c]
-	
+
 	#raise exception if columns is empty
 	if not columns:
-		raise ValueError(NO_COLUMN_EXCEPTION.format(column_regex))
+		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('column', column_regex))
 
 	return columns
 
@@ -64,10 +63,6 @@ def get_column_regex_matches(df, column_regex):
 def get_column_group_counts(dataframe, columns):
 	# in pandas get the distinct counts for each value in a column
 	groupings_dict = { column: dataframe[column].value_counts().reset_index(name='counts') for column in columns }
-	
-	#raise exception if groupings_dict is empty
-	if not groupings_dict:
-		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('column', column_regex))
 
 	return groupings_dict
 
@@ -102,7 +97,7 @@ def get_column_value_regex_matches(dataframe, columns, value_regex):
 
 	#raise exception if value_dict is empty
 	if value_dict == 0:
-		raise ValueError(NO_COLUMN_EXCEPTION.format(column_regex))
+		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('column values', column_regex))
 
 	return value_dict
 
@@ -126,7 +121,7 @@ def main(file_regex, column_regex, value_regex):
 
 		print(SEARCH_LOG.format('files', file_regex))
 		regex_filenames = get_filename_from_regex(file_regex)
-		dataframe = read_files(regex_filenames)
+		dataframe = read_files(regex_filenames, file_regex)
 
 		filename_dict = get_column_group_counts(dataframe, ['filename'])
 		log(file_regex, filename_dict, 'file')
