@@ -10,7 +10,6 @@ SEPARATORS = [',', '|', '\t']
 SEARCH_LOG = 'Searching for {} containing "{}".'
 SEARCH_FINISH_LOG = 'Completed search.'
 SEARCH_FAILURE_LOG = 'SEARCH FAILED.'
-
 SEARCH_FAILURE_EXCEPTION = 'No {} containing "{}" keyword.'
 MATCH_LOG = 'Located {} regex match for "{}":'
 
