@@ -1,31 +1,34 @@
+#remove unnecessary imports
+import os
+import re
+import logging
 import click
 
-from pyspark.sql import functions as F, Window, types as spark_types
-
-from pandas import pd
-from buildamap.utils import spark
-from buildamap.common import getlogger
-from buildamap.rds.utils.postgres_requests import list_audiences
-from buildamap.parse_bam_config import OverriddenConfig, get_bam_config
+import pandas as pd
 
 
 
-logger = getlogger(__name__)
 SEPARATORS = [',', '|', '\t']
-
 FILE_SEARCH_LOG = 'Seaching for files containing "{}".'
 NO_FILE_EXCEPTION = 'No files names containing "{}" keyword.'
 NO_COLUMN_EXCEPTION = 'No columns names containing "{}" keyword.'
 COLUMN_MATCH_LOG = 'Column Regex Match for "{}":'
+NO_SEPARATOR_EXCEPTION = 'No separator found in file.'
 
+#instantiate the logger
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 #create a function that finds all file names that match the regex
 def get_filename_from_regex(file_regex):
+	
+
 	#get all files in the current directory
 	files = os.listdir()
 
-	#use the regex to find all files that match the regex
-	regex_files = re.findall(file_regex, files)
+	#find strings in a list of strings that match a regex
+	regex_files = [file for file in files if re.search(file_regex, file)]
+	
 
 	#raise exception if no files are found
 	if not regex_files:
@@ -41,7 +44,7 @@ def infer_separator(filename):
 			if separator in first_line:
 				return separator
 		else:
-			raise ValueError('No separator found in file.')
+			raise ValueError(NO_SEPARATOR_EXCEPTION)
 
 
 def read_files(filenames):
@@ -59,34 +62,44 @@ def get_column_regex_matches(df, column_regex):
 	#raise exception if columns is empty
 	if not columns:
 		raise ValueError(NO_COLUMN_EXCEPTION.format(column_regex))
+
 	return columns
 
 
 
 
-def concatenate_filters(columns):
-	return ' OR '.join(
-		["{} IS NOT NULL".format(col) for col in columns]
-	)
+def get_column_group_counts(dataframe, columns):
+	# in pandas get the distinct counts for each value in a column
+	groupings_dict = { column: dataframe[column].value_counts().reset_index(name='counts') for column in columns }
+	
+	#raise exception if groupings_dict is empty
+	if not groupings_dict:
+		raise ValueError(NO_COLUMN_EXCEPTION.format(column_regex))
+
+	return groupings_dict
 
 
-def get_column_value_regex_matches(df, columns, value_regex):
-	filters = concatenate_filters(columns)
+#create a function to take a pandas dataframe, and filter it to ensure that there are no null values in a list of columns.
+def filter_null_values(dataframe, columns):
+	
+	for column in columns:
+		filtered_dataframe = df[column].notnull()
+	return filters
+
+
+
+def get_column_value_regex_matches(dataframe, columns, value_regex):
+	df_filtered = filter_null_values(dataframe, columns)
 	df_filtered = df.where(F.expr(filters)).persist()
 
 	column_dict = {column: df_filtered.filter(F.col(column).contains(value_regex)).count() for column in columns}
 	
 	return column_dict
 
-def get_column_group_counts(df, columns):
-	#from the df pandas dataframe, get grouped counts of the columns individually
-	column_groupings = df.groupby(columns).size().reset_index(name='counts')
-
-	return column_groupings
 
 
 
-def log(columns, column_regex):
+def log(columns, column_regex, column_groupings):
 	logger.info(
 		'\n'.join([
 		COLUMN_MATCH_LOG.format(column_regex),
@@ -100,24 +113,29 @@ def log(columns, column_regex):
 @click.option("--value_regex", "-v", default=None)
 def main(file_regex, column_regex, value_regex):
 	try:
-		filenames = get_filename_from_regex(file_regex)
-		df = read_files(filenames)
+		
+		
+		#log an error message saying "hello"
+		logger.info('Hello')
+
+		regex_filenames = get_filename_from_regex(file_regex)
+		df = read_files(regex_filenames)
 
 		columns = get_column_regex_matches(df, column_regex)
 		column_groupings = get_column_group_counts(df, columns)
 		log(columns, column_regex, column_groupings)
 
-
 		import ipdb; ipdb.set_trace()
+
 		if value_regex:
 			column_dict = get_column_value_regex_matches(df, columns, value_regex)
 			# LOG
 	
 	finally:
-		spark.session.stop()
+		logger.error("Goodbye")
 
 
 if __name__ == "__main__":
 	main()
 
-# python -m buildamap.clients.common.files.search
+# python search.py -f customer -c rewards_tier -v Gold
