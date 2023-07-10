@@ -97,7 +97,7 @@ def get_column_value_regex_matches(dataframe, columns, value_regex):
 
 	#raise exception if value_dict is empty
 	if value_dict == 0:
-		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('column values', column_regex))
+		raise ValueError(SEARCH_FAILURE_EXCEPTION.format('column values', value_regex))
 
 	return value_dict
 
